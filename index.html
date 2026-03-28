@@ -8,31 +8,54 @@
   <style>
     body {
       font-family: Arial;
+      background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
       text-align: center;
       padding: 20px;
-      background: #0f172a;
-      color: white;
+      margin: 0;
     }
+
+    h1 {
+      color: #6b21a8;
+      margin-bottom: 5px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 20px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    video {
+      width: 100%;
+      border-radius: 15px;
+    }
+
     button {
-      padding: 15px;
+      padding: 12px 15px;
       margin: 10px;
       border-radius: 10px;
       border: none;
-      font-size: 16px;
+      font-size: 14px;
+      cursor: pointer;
     }
-    .start { background: green; color: white; }
-    .voice { background: gray; color: white; }
 
-    video {
-      width: 90%;
-      max-width: 400px;
-      margin-top: 20px;
-      border-radius: 10px;
-    }
+    .start { background: #22c55e; color: white; }
+    .flip { background: #3b82f6; color: white; }
+    .voice { background: #6b7280; color: white; }
 
     #output {
-      margin-top: 20px;
-      font-size: 18px;
+      margin-top: 15px;
+      font-size: 16px;
+      color: #333;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-weight: bold;
+      color: red;
     }
   </style>
 </head>
@@ -42,20 +65,31 @@
   <h1>SafeStep 🚶‍♂️</h1>
   <p>AI Navigation Assistant</p>
 
-  <button class="start" onclick="startRealCamera()">Start Camera</button>
-  <button class="voice" onclick="toggleVoice()">Toggle Voice</button>
+  <div class="card">
+    <video id="video" autoplay playsinline></video>
 
-  <div id="output">Status: Idle</div>
+    <div>
+      <button class="start" onclick="startCamera()">Start Camera</button>
+      <button class="flip" onclick="flipCamera()">Flip Camera</button>
+      <button class="voice" onclick="toggleVoice()">Voice</button>
+    </div>
 
-  <!-- ✅ AI LIBRARIES -->
+    <div id="output">Status: Idle</div>
+  </div>
+
+  <!-- AI -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-  <!-- ✅ MAIN SCRIPT -->
   <script>
     let model;
-    let video;
+    let video = document.getElementById("video");
+    let currentFacing = "environment"; // back camera default
+    let stream;
+
     let voiceEnabled = true;
+    let lastSpoken = "";
+    let lastTime = 0;
 
     function speak(text) {
       if (!voiceEnabled) return;
@@ -63,57 +97,57 @@
       speechSynthesis.speak(msg);
     }
 
-    async function initCamera() {
-      video = document.createElement("video");
-      video.autoplay = true;
+    async function startCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentFacing }
+      });
+
       video.srcObject = stream;
 
-      document.body.appendChild(video);
-    }
+      document.getElementById("output").innerText = "Camera Started";
 
-    async function loadModel() {
-      model = await cocoSsd.load();
-      document.getElementById("output").innerText = "AI Model Loaded";
-    }
-
-    async function detect() {
-  const predictions = await model.detect(video);
-
-  if (predictions.length > 0) {
-    const msg = predictions
-      .map(p => `${p.class} ahead`)
-      .join(", ");
-
-    document.getElementById("output").innerText = msg;
-
-    // ✅ Speak only if message changed
-    if (msg !== lastSpoken) {
-      speechSynthesis.cancel(); // stop old speech
-      speak(msg);
-      lastSpoken = msg;
-    }
-
-  } else {
-    document.getElementById("output").innerText = "No objects detected";
-  }
-
-  requestAnimationFrame(detect);
-}
-
-    async function startRealCamera() {
-      document.getElementById("output").innerText = "Starting camera...";
-
-      await initCamera();
-      await loadModel();
+      if (!model) {
+        model = await cocoSsd.load();
+        document.getElementById("output").innerText = "AI Model Loaded";
+      }
 
       detect();
     }
 
+    async function flipCamera() {
+      currentFacing = currentFacing === "user" ? "environment" : "user";
+      startCamera();
+    }
+
+    async function detect() {
+      const predictions = await model.detect(video);
+
+      if (predictions.length > 0) {
+        const msg = predictions.map(p => p.class).join(", ");
+
+        document.getElementById("output").innerText = "⚠️ " + msg;
+
+        if (msg !== lastSpoken && Date.now() - lastTime > 2000) {
+          speechSynthesis.cancel();
+          speak(msg);
+          lastSpoken = msg;
+          lastTime = Date.now();
+        }
+      } else {
+        document.getElementById("output").innerText = "✅ Safe";
+      }
+
+      requestAnimationFrame(detect);
+    }
+
     function toggleVoice() {
       voiceEnabled = !voiceEnabled;
-      document.getElementById("output").innerText = voiceEnabled ? "Voice ON" : "Voice OFF";
+      document.getElementById("output").innerText =
+        voiceEnabled ? "Voice ON" : "Voice OFF";
     }
   </script>
 
