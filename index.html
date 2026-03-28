@@ -1,155 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>SafeStep</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  body {
+    margin: 0;
+    font-family: Arial;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
+  }
 
-  <style>
-    body {
-      font-family: Arial;
-      background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
-      text-align: center;
-      padding: 20px;
-      margin: 0;
-    }
+  /* 🌌 Animated background */
+  .bg {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+  }
 
-    h1 {
-      color: #6b21a8;
-      margin-bottom: 5px;
-    }
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    animation: float 10s infinite ease-in-out;
+  }
 
-    .card {
-      background: white;
-      border-radius: 20px;
-      padding: 20px;
-      max-width: 400px;
-      margin: auto;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
+  .bubble:nth-child(1) {
+    width: 200px; height: 200px;
+    top: 10%; left: 10%;
+  }
 
-    video {
-      width: 100%;
-      border-radius: 15px;
-    }
+  .bubble:nth-child(2) {
+    width: 150px; height: 150px;
+    top: 60%; left: 70%;
+  }
 
-    button {
-      padding: 12px 15px;
-      margin: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 14px;
-      cursor: pointer;
-    }
+  .bubble:nth-child(3) {
+    width: 100px; height: 100px;
+    top: 40%; left: 40%;
+  }
 
-    .start { background: #22c55e; color: white; }
-    .flip { background: #3b82f6; color: white; }
-    .voice { background: #6b7280; color: white; }
+  @keyframes float {
+    0% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-40px) scale(1.1); }
+    100% { transform: translateY(0px) scale(1); }
+  }
 
-    #output {
-      margin-top: 15px;
-      font-size: 16px;
-      color: #333;
-    }
+  h1 {
+    text-align: center;
+    color: #6b21a8;
+    margin-top: 20px;
+  }
 
-    .status {
-      margin-top: 10px;
-      font-weight: bold;
-      color: red;
-    }
-  </style>
-</head>
+  .card {
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 20px;
+    max-width: 400px;
+    margin: auto;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    transform: perspective(1000px) rotateX(2deg);
+    transition: 0.3s;
+  }
 
-<body>
+  .card:hover {
+    transform: perspective(1000px) rotateX(0deg) scale(1.02);
+  }
 
-  <h1>SafeStep 🚶‍♂️</h1>
-  <p>AI Navigation Assistant</p>
+  video {
+    width: 100%;
+    border-radius: 15px;
+    margin-bottom: 10px;
+  }
 
-  <div class="card">
-    <video id="video" autoplay playsinline></video>
+  button {
+    padding: 12px;
+    margin: 5px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+  }
 
-    <div>
-      <button class="start" onclick="startCamera()">Start Camera</button>
-      <button class="flip" onclick="flipCamera()">Flip Camera</button>
-      <button class="voice" onclick="toggleVoice()">Voice</button>
-    </div>
+  button:hover {
+    transform: scale(1.05);
+  }
 
-    <div id="output">Status: Idle</div>
-  </div>
+  .start { background: #22c55e; color: white; }
+  .flip { background: #3b82f6; color: white; }
+  .voice { background: #6b7280; color: white; }
 
-  <!-- AI -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
-  <script>
-    let model;
-    let video = document.getElementById("video");
-    let currentFacing = "environment"; // back camera default
-    let stream;
-
-    let voiceEnabled = true;
-    let lastSpoken = "";
-    let lastTime = 0;
-
-    function speak(text) {
-      if (!voiceEnabled) return;
-      const msg = new SpeechSynthesisUtterance(text);
-      speechSynthesis.speak(msg);
-    }
-
-    async function startCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: currentFacing }
-      });
-
-      video.srcObject = stream;
-
-      document.getElementById("output").innerText = "Camera Started";
-
-      if (!model) {
-        model = await cocoSsd.load();
-        document.getElementById("output").innerText = "AI Model Loaded";
-      }
-
-      detect();
-    }
-
-    async function flipCamera() {
-      currentFacing = currentFacing === "user" ? "environment" : "user";
-      startCamera();
-    }
-
-    async function detect() {
-      const predictions = await model.detect(video);
-
-      if (predictions.length > 0) {
-        const msg = predictions.map(p => p.class).join(", ");
-
-        document.getElementById("output").innerText = "⚠️ " + msg;
-
-        if (msg !== lastSpoken && Date.now() - lastTime > 2000) {
-          speechSynthesis.cancel();
-          speak(msg);
-          lastSpoken = msg;
-          lastTime = Date.now();
-        }
-      } else {
-        document.getElementById("output").innerText = "✅ Safe";
-      }
-
-      requestAnimationFrame(detect);
-    }
-
-    function toggleVoice() {
-      voiceEnabled = !voiceEnabled;
-      document.getElementById("output").innerText =
-        voiceEnabled ? "Voice ON" : "Voice OFF";
-    }
-  </script>
-
-</body>
-</html>
+  #output {
+    margin-top: 10px;
+    font-size: 16px;
+    color: #111;
+  }
+</style>
