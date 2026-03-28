@@ -79,21 +79,28 @@
     }
 
     async function detect() {
-      const predictions = await model.detect(video);
+  const predictions = await model.detect(video);
 
-      if (predictions.length > 0) {
-        const msg = predictions
-          .map(p => `${p.class} ahead`)
-          .join(", ");
+  if (predictions.length > 0) {
+    const msg = predictions
+      .map(p => `${p.class} ahead`)
+      .join(", ");
 
-        document.getElementById("output").innerText = msg;
-        speak(msg);
-      } else {
-        document.getElementById("output").innerText = "No objects detected";
-      }
+    document.getElementById("output").innerText = msg;
 
-      requestAnimationFrame(detect);
+    // ✅ Speak only if message changed
+    if (msg !== lastSpoken) {
+      speechSynthesis.cancel(); // stop old speech
+      speak(msg);
+      lastSpoken = msg;
     }
+
+  } else {
+    document.getElementById("output").innerText = "No objects detected";
+  }
+
+  requestAnimationFrame(detect);
+}
 
     async function startRealCamera() {
       document.getElementById("output").innerText = "Starting camera...";
