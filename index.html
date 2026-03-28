@@ -1,100 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>SafeStep</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body {
-      font-family: Arial;
-      text-align: center;
-      padding: 20px;
-      background: #0f172a;
-      color: white;
-    }
-    button {
-      padding: 15px;
-      margin: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 16px;
-    }
-    .start { background: green; color: white; }
-    .stop { background: red; color: white; }
-    .scan { background: orange; color: black; }
-    .voice { background: gray; color: white; }
-    #output {
-      margin-top: 20px;
-      font-size: 18px;
-    }
-  </style>
-</head>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-<body>
+<script>
+let model;
+let video;
+let scanning = false;
 
-  <h1>SafeStep 🚶‍♂️</h1>
-  <p>AI Navigation Assistant</p>
+async function initCamera() {
+  video = document.createElement("video");
+  video.autoplay = true;
 
-  <button class="start" onclick="toggleCamera()">Start Camera</button>
-  <button class="scan" onclick="toggleScan()">Scan</button>
-  <button class="voice" onclick="toggleVoice()">Toggle Voice</button>
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
 
-  <div id="output">Status: Idle</div>
+  document.body.appendChild(video);
+}
 
-  <script>
-    let scanning = false;
-    let voiceEnabled = true;
-    let interval;
+async function loadModel() {
+  model = await cocoSsd.load();
+  console.log("Model loaded");
+}
 
-    const objects = [
-      { label: "Person", direction: "Ahead", distance: "3m" },
-      { label: "Bench", direction: "Left", distance: "1.5m" },
-      { label: "Bicycle", direction: "Right", distance: "4m" },
-      { label: "Car", direction: "Right", distance: "5m" }
-    ];
+async function detect() {
+  if (!scanning) return;
 
-    function speak(text) {
-      if (!voiceEnabled) return;
-      const msg = new SpeechSynthesisUtterance(text);
-      speechSynthesis.speak(msg);
-    }
+  const predictions = await model.detect(video);
 
-    function simulateDetection() {
-      const count = Math.floor(Math.random() * 3);
-      return objects.sort(() => 0.5 - Math.random()).slice(0, count);
-    }
+  if (predictions.length > 0) {
+    const msg = predictions
+      .map(p => `${p.class} ahead`)
+      .join(", ");
 
-    function toggleCamera() {
-      document.getElementById("output").innerText = "Camera Started (Simulated)";
-    }
+    document.getElementById("output").innerText = msg;
 
-    function toggleScan() {
-      scanning = !scanning;
+    const speech = new SpeechSynthesisUtterance(msg);
+    speechSynthesis.speak(speech);
+  }
 
-      if (scanning) {
-        interval = setInterval(() => {
-          const results = simulateDetection();
+  requestAnimationFrame(detect);
+}
 
-          if (results.length === 0) {
-            document.getElementById("output").innerText = "Safe";
-          } else {
-            const msg = results.map(r => `${r.label} ${r.direction}`).join(", ");
-            document.getElementById("output").innerText = msg;
-            speak(msg);
-          }
-
-        }, 3000);
-      } else {
-        clearInterval(interval);
-        document.getElementById("output").innerText = "Stopped";
-      }
-    }
-
-    function toggleVoice() {
-      voiceEnabled = !voiceEnabled;
-      document.getElementById("output").innerText = voiceEnabled ? "Voice ON" : "Voice OFF";
-    }
-  </script>
-
-</body>
-</html>
+async function startRealCamera() {
+  await initCamera();
+  await loadModel();
+  scanning = true;
+  detect();
+}
+</script>
